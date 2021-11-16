@@ -1,7 +1,5 @@
 module Assignment0 where
 
-import Test.Read (readMaybe)
-
 -- 1 
 unwordsDC :: [String] -> String
 unwordsDC [] = ""
@@ -27,8 +25,8 @@ wordsFoldr str = foldr f [] str
 -- Nah
 
 -- 3
-f :: [Int] -> Int
-f xs = snd $ foldr (\b (t,v) -> (t * 10, v + (b * t))) (1,0) xs
+f :: [Int] -> Int 
+f = foldl (\a b -> 10 * a + b) 0
 
 f2 :: String -> Int
 f2 str = f (map (\s -> read s :: Int) (wordsH str))
