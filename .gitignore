@@ -1,4 +1,6 @@
-.stack-work/
 *~
+.stack-work/
+dist/
+dist-newstyle/
 
 .vscode/
