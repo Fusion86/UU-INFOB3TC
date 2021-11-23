@@ -33,7 +33,7 @@ parseDateTime :: Parser Char DateTime
 parseDateTime = undefined
 
 parseDay :: Parser Char Day
-parseDay = 
+parseDay = undefined
 
 -- Exercise 2
 run :: Parser a b -> [a] -> Maybe b

@@ -6,7 +6,8 @@ import Calendar
 import Features
 import System.Environment
 import System.IO
-
+import ParseLib.Abstract
+import Data.Char
 
 data Result = SyntaxError | Invalid DateTime | Valid DateTime deriving (Eq, Ord)
 
@@ -36,3 +37,15 @@ mainCalendar = do
     file:_ <- getArgs
     res <- readCalendar file
     putStrLn $ maybe "Calendar parsing error" (ppMonth (Year 2012) (Month 11)) res
+
+parseName0 :: Parser Char String
+parseName0 = do
+  token "name0"
+  many $ satisfy isSpace
+  symbol '='
+  many $ satisfy isSpace
+  result <- pack mark anything mark
+  return result
+    where 
+      mark = symbol '\''
+      anything = many $ satisfy (/= '\'')
