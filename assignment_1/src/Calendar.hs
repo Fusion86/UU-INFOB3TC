@@ -6,46 +6,45 @@ import Prelude hiding (sequence, ($>), (*>), (<$), (<*))
 
 -- Exercise 6
 data Calendar = Calendar
-  { properties :: [CalendarProp],
+  { properties :: [Token],
     event :: [Event]
   }
   deriving (Eq, Ord)
 
-data Event
-  = DateTimeStamp DateTime
-  | Uid String
-  | DateTimeStart DateTime
-  | DateTimeEnd DateTime
-  | Description String
-  | Summary String
-  | Location String
-  deriving (Eq, Ord)
-
-data CalendarProp
-  = ProdId String
-  | Version
+data Event = Event
+  {
+  }
   deriving (Eq, Ord)
 
 -- Exercise 7
-data Token = Token
-  { key :: String,
-    value :: String
-  }
-  deriving (Eq, Ord, Show)
+data Token
+  = BeginToken String
+  | VersionToken
+  | ProdIdToken String
+  | UidToken String
+  | DtStampToken DateTime
+  | DtStartToken DateTime
+  | DtEndToken DateTime
+  | SummaryToken String
+  | EndToken String
+  deriving (Eq, Ord)
 
 scanCalendar :: Parser Char [Token]
 scanCalendar = greedy parseToken
   where
-    notNewline = satisfy (\c -> c /= '\r' && c /= '\n') 
+    notNewline = satisfy (\c -> c /= '\r' && c /= '\n')
+
+    -- parseToken :: Parser Char Token
+    -- parseToken = do
+    --   key <- greedy $ satisfy (/= ':')
+    --   symbol ':'
+    --   value <- greedy notNewline
+    --   optional $ symbol '\r'
+    --   symbol '\n'
+    --   return $ Token key value
 
     parseToken :: Parser Char Token
-    parseToken = do
-      key <- greedy $ satisfy (/= ':')
-      symbol ':'
-      value <- greedy notNewline
-      optional $ symbol '\r'
-      symbol '\n'
-      return $ Token key value
+    parseToken = undefined
 
 parseCalendar :: Parser Token Calendar
 parseCalendar = undefined
