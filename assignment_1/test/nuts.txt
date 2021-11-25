@@ -1,0 +1,5 @@
+key:value
+deez
+deez:nuts
+hallo
+   : wereld
