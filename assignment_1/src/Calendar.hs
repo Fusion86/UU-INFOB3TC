@@ -1,5 +1,6 @@
 module Calendar where
 
+import Control.Monad (liftM2)
 import Data.Functor (($>), (<&>))
 import DateTime
 import ParseLib.Abstract
@@ -19,8 +20,8 @@ data Event = Event
 
 -- Exercise 7
 data Token
-  = StringToken String String
-  | DateTimeToken String DateTime
+  = StringToken {key :: String, strValue :: String}
+  | DateTimeToken {key :: String, dtValue :: DateTime}
   deriving (Eq, Ord)
 
 scanCalendar :: Parser Char [Token]
@@ -29,7 +30,7 @@ scanCalendar = greedy parseToken
     notNewline = satisfy (\c -> c /= '\r' && c /= '\n')
 
     parseToken :: Parser Char Token
-    parseToken = parseKeyStringToken <|> parseKeyDateTimeToken
+    parseToken = parseKeyDateTimeToken <|> parseKeyStringToken
 
     parseKeyWithValue :: Parser Char s -> Parser Char (String, s)
     parseKeyWithValue valueParser = do
@@ -39,6 +40,10 @@ scanCalendar = greedy parseToken
       optional (symbol '\r')
       symbol '\n'
       return (key, value)
+
+    -- You can't tell me that this is better code.
+    -- parseKeyWithValue :: Parser Char s -> Parser Char (String, s)
+    -- parseKeyWithValue valueParser = liftM2 (,) (greedy (satisfy (/= ':')) <* symbol ':') (valueParser <* optional (symbol '\r') <* symbol '\n')
 
     parseKeyStringToken :: Parser Char Token
     parseKeyStringToken = parseKeyWithValue (greedy notNewline) <&> uncurry StringToken
@@ -50,15 +55,26 @@ parseCalendar :: Parser Token Calendar
 parseCalendar = do
   symbol (StringToken "BEGIN" "VCALENDAR")
   symbol (StringToken "VERSION" "2.0")
-  prodid <- requireKey "PRODID"
+  prodid <- requireString "PRODID"
   symbol (StringToken "BEGIN" "VEVENT")
-  return $ Calendar [] []
+  uid <- requireString "UID"
+  stamp <- requireDateTime "DTSTAMP"
+  start <- requireDateTime "DTSTART"
+  end <- requireDateTime "DTEND"
+  summary <- requireString "SUMMARY"
+  symbol (StringToken "END" "VEVENT")
+  symbol (StringToken "END" "VCALENDAR")
+  return $ Calendar [StringToken "PRODID" prodid] []
   where
-    requireKey :: String -> Parser Token Token
-    requireKey key = satisfy (requireKey' key)
+    requireString :: String -> Parser Token String
+    requireString key = satisfy (\(StringToken k v) -> key == k) <&> strValue
+
+    -- Why do we have to use a helper function here whereas a lambda is sufficient in the above case???
+    requireDateTime :: String -> Parser Token DateTime
+    requireDateTime key = satisfy f <&> dtValue
       where
-        requireKey' expected (StringToken actual _) = expected == actual
-        requireKey' expected (DateTimeToken actual _) = expected == actual
+        f (DateTimeToken k v) = key == k
+        f (StringToken _ _) = False
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
