@@ -1,8 +1,9 @@
 module DateTime where
 
-import Data.Char
+import Control.Monad (replicateM)
+import Data.Char (Char, digitToInt, isDigit)
 import Data.Functor ((<&>))
-import Data.Maybe
+import Data.Maybe (Maybe, isJust, listToMaybe)
 import ParseLib.Abstract
 import Text.Printf (printf)
 import Prelude hiding (sequence, ($>), (*>), (<$), (<*))
@@ -56,7 +57,7 @@ parseDateTime = do
 
 parseDigits :: (Int -> b) -> Int -> Parser Char b
 parseDigits ctor count = do
-  sequence (replicate count parseDigit) <&> ctor . digitsToNumber
+  replicateM count parseDigit <&> ctor . digitsToNumber
 
 parseDigit :: Parser Char Int
 parseDigit = do
@@ -76,12 +77,17 @@ printDateTime (DateTime (Date y m d) (Time hh mm ss) utc) =
   printf "%04d%02d%02dT%02d%02d%02d%s" (runYear y) (runMonth m) (runDay d) (runHour hh) (runMinute mm) (runSecond ss) (if utc then "Z" else "")
 
 -- Exercise 4
-parsePrint s = fmap printDateTime $ run parseDateTime s
+parsePrint :: [Char] -> Maybe String
+parsePrint s = printDateTime <$> run parseDateTime s
 
 -- Exercise 5
 checkDateTime :: DateTime -> Bool
 checkDateTime (DateTime (Date y m d) (Time hh mm ss) _) =
-  validRange 1 12 (runMonth m)&& (validDay (runYear y) (runMonth m) (runDay d)) && validRange  0 23 (runHour hh)&& validRange  0 59 (runMinute mm)&& validRange  0 59 (runSecond ss)
+  validRange 1 12 (runMonth m)
+    && validDay (runYear y) (runMonth m) (runDay d)
+    && validRange 0 23 (runHour hh)
+    && validRange 0 59 (runMinute mm)
+    && validRange 0 59 (runSecond ss)
   where
     validRange min max actual = min <= actual && actual <= max
     validDay y m d = validRange 0 (daysInMonth y m d) d
@@ -93,4 +99,5 @@ checkDateTime (DateTime (Date y m d) (Time hh mm ss) _) =
       where
         divBy x = mod y x == 0
 
+parseCheck :: [Char] -> Maybe Bool
 parseCheck s = checkDateTime <$> run parseDateTime s

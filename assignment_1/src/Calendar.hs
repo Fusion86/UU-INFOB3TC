@@ -1,5 +1,6 @@
 module Calendar where
 
+import Data.Functor (($>), (<&>))
 import DateTime
 import ParseLib.Abstract
 import Prelude hiding (sequence, ($>), (*>), (<$), (<*))
@@ -34,20 +35,38 @@ scanCalendar = greedy parseToken
   where
     notNewline = satisfy (\c -> c /= '\r' && c /= '\n')
 
-    -- parseToken :: Parser Char Token
-    -- parseToken = do
-    --   key <- greedy $ satisfy (/= ':')
-    --   symbol ':'
-    --   value <- greedy notNewline
-    --   optional $ symbol '\r'
-    --   symbol '\n'
-    --   return $ Token key value
-
     parseToken :: Parser Char Token
-    parseToken = undefined
+    parseToken =
+      do
+        parseKeyStringToken BeginToken "BEGIN"
+        <|> parseKeyVersionToken
+        <|> parseKeyStringToken ProdIdToken "PRODID"
+        <|> parseKeyStringToken UidToken "UID"
+        <|> parseKeyDateTimeToken DtStampToken "DTSTAMP"
+        <|> parseKeyDateTimeToken DtStartToken "DTSTART"
+        <|> parseKeyDateTimeToken DtEndToken "DTEND"
+        <|> parseKeyStringToken SummaryToken "SUMMARY"
+        <|> parseKeyStringToken EndToken "END"
+
+    parseKeyWithValue :: String -> Parser Char s -> Parser Char s
+    parseKeyWithValue key valueParser =
+      token key *> symbol ':' *> valueParser <* optional (symbol '\r') <* symbol '\n'
+
+    parseKeyStringToken :: (String -> Token) -> String -> Parser Char Token
+    parseKeyStringToken ctor key = parseKeyWithValue key (greedy notNewline) <&> ctor
+
+    parseKeyDateTimeToken :: (DateTime -> Token) -> String -> Parser Char Token
+    parseKeyDateTimeToken ctor key = parseKeyWithValue key parseDateTime <&> ctor
+
+    parseKeyVersionToken :: Parser Char Token
+    parseKeyVersionToken = parseKeyWithValue "VERSION" (token "2.0") $> VersionToken
 
 parseCalendar :: Parser Token Calendar
-parseCalendar = undefined
+parseCalendar = do
+  symbol (BeginToken "VCALENDAR")
+  symbol VersionToken
+  prodid <- symbol (ProdIdToken "")
+  return $ Calendar [] []
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
