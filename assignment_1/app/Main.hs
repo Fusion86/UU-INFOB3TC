@@ -23,7 +23,7 @@ main :: IO ()
 main = do
   hSetNewlineMode stdin  noNewlineTranslation
   hSetNewlineMode stdout noNewlineTranslation
-  mainDateTime
+  mainCalendar
 
 mainDateTime :: IO ()
 mainDateTime = interact (printOutput . processCheck . processInput)

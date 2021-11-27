@@ -19,15 +19,8 @@ data Event = Event
 
 -- Exercise 7
 data Token
-  = BeginToken String
-  | VersionToken
-  | ProdIdToken String
-  | UidToken String
-  | DtStampToken DateTime
-  | DtStartToken DateTime
-  | DtEndToken DateTime
-  | SummaryToken String
-  | EndToken String
+  = StringToken String String
+  | DateTimeToken String DateTime
   deriving (Eq, Ord)
 
 scanCalendar :: Parser Char [Token]
@@ -36,44 +29,43 @@ scanCalendar = greedy parseToken
     notNewline = satisfy (\c -> c /= '\r' && c /= '\n')
 
     parseToken :: Parser Char Token
-    parseToken =
-      do
-        parseKeyStringToken BeginToken "BEGIN"
-        <|> parseKeyVersionToken
-        <|> parseKeyStringToken ProdIdToken "PRODID"
-        <|> parseKeyStringToken UidToken "UID"
-        <|> parseKeyDateTimeToken DtStampToken "DTSTAMP"
-        <|> parseKeyDateTimeToken DtStartToken "DTSTART"
-        <|> parseKeyDateTimeToken DtEndToken "DTEND"
-        <|> parseKeyStringToken SummaryToken "SUMMARY"
-        <|> parseKeyStringToken EndToken "END"
+    parseToken = parseKeyStringToken <|> parseKeyDateTimeToken
 
-    parseKeyWithValue :: String -> Parser Char s -> Parser Char s
-    parseKeyWithValue key valueParser =
-      token key *> symbol ':' *> valueParser <* optional (symbol '\r') <* symbol '\n'
+    parseKeyWithValue :: Parser Char s -> Parser Char (String, s)
+    parseKeyWithValue valueParser = do
+      key <- greedy $ satisfy (/= ':')
+      symbol ':'
+      value <- valueParser
+      optional (symbol '\r')
+      symbol '\n'
+      return (key, value)
 
-    parseKeyStringToken :: (String -> Token) -> String -> Parser Char Token
-    parseKeyStringToken ctor key = parseKeyWithValue key (greedy notNewline) <&> ctor
+    parseKeyStringToken :: Parser Char Token
+    parseKeyStringToken = parseKeyWithValue (greedy notNewline) <&> uncurry StringToken
 
-    parseKeyDateTimeToken :: (DateTime -> Token) -> String -> Parser Char Token
-    parseKeyDateTimeToken ctor key = parseKeyWithValue key parseDateTime <&> ctor
-
-    parseKeyVersionToken :: Parser Char Token
-    parseKeyVersionToken = parseKeyWithValue "VERSION" (token "2.0") $> VersionToken
+    parseKeyDateTimeToken :: Parser Char Token
+    parseKeyDateTimeToken = parseKeyWithValue parseDateTime <&> uncurry DateTimeToken
 
 parseCalendar :: Parser Token Calendar
 parseCalendar = do
-  symbol (BeginToken "VCALENDAR")
-  symbol VersionToken
-  prodid <- symbol (ProdIdToken "")
+  symbol (StringToken "BEGIN" "VCALENDAR")
+  symbol (StringToken "VERSION" "2.0")
+  prodid <- requireKey "PRODID"
+  symbol (StringToken "BEGIN" "VEVENT")
   return $ Calendar [] []
+  where
+    requireKey :: String -> Parser Token Token
+    requireKey key = satisfy (requireKey' key)
+      where
+        requireKey' expected (StringToken actual _) = expected == actual
+        requireKey' expected (DateTimeToken actual _) = expected == actual
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 
 -- Exercise 8
 readCalendar :: FilePath -> IO (Maybe Calendar)
-readCalendar = undefined
+readCalendar fp = readFile fp <&> recognizeCalendar
 
 -- Exercise 9
 -- DO NOT use a derived Show instance. Your printing style needs to be nicer than that :)
