@@ -1,9 +1,8 @@
 module Features where
 
-import DateTime
 import Calendar
+import DateTime
 import Text.PrettyPrint.Boxes
-
 
 -- Exercise 10
 countEvents :: Calendar -> Int
@@ -20,5 +19,4 @@ timeSpent = undefined
 
 -- Exercise 11
 ppMonth :: Year -> Month -> Calendar -> String
-ppMonth _ _ _ = "yeet"
-
+ppMonth _ _ cal = printCalendar cal

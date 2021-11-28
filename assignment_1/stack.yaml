@@ -20,7 +20,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/12.yaml
+resolver: lts-18.18
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -32,7 +32,7 @@ resolver: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots
 #   - auto-update
 #   - wai
 packages:
-- .
+  - .
 # The following packages have been ignored due to incompatibility with the
 # resolver compiler, dependency conflicts with other packages
 # or unsatisfied dependencies.
@@ -43,7 +43,7 @@ packages:
 # forks / in-progress versions pinned to a git hash. For example:
 #
 extra-deps:
-- uu-tc-2015.1.1@sha256:c41c7e3e07e169c82b0467a301fcda2002ea76903d779a7d18e62b68dde0e4cb,2090
+  - uu-tc-2015.1.1@sha256:c41c7e3e07e169c82b0467a301fcda2002ea76903d779a7d18e62b68dde0e4cb,2090
 # - acme-missiles-0.3
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
