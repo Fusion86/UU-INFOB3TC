@@ -20,5 +20,5 @@ timeSpent = undefined
 
 -- Exercise 11
 ppMonth :: Year -> Month -> Calendar -> String
-ppMonth _ _ _ = "yeet"
+ppMonth _ _ cal = printCalendar cal
 

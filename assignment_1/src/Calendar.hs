@@ -2,8 +2,10 @@ module Calendar where
 
 import Control.Monad (liftM2)
 import Data.Functor (($>), (<&>))
+import Data.List (intercalate)
 import DateTime
 import ParseLib.Abstract
+import System.IO (IOMode (ReadMode), hGetContents, openFile)
 import Prelude hiding (sequence, ($>), (*>), (<$), (<*))
 
 -- Exercise 6
@@ -14,7 +16,11 @@ data Calendar = Calendar
   deriving (Eq, Ord)
 
 data Event = Event
-  {
+  { uid :: String,
+    dateTimeStamp :: DateTime,
+    dateTimeStart :: DateTime,
+    dateTimeEnd :: DateTime,
+    summary :: String
   }
   deriving (Eq, Ord)
 
@@ -22,6 +28,7 @@ data Event = Event
 data Token
   = StringToken {key :: String, strValue :: String}
   | DateTimeToken {key :: String, dtValue :: DateTime}
+  | VersionToken
   deriving (Eq, Ord)
 
 scanCalendar :: Parser Char [Token]
@@ -37,8 +44,7 @@ scanCalendar = greedy parseToken
       key <- greedy $ satisfy (/= ':')
       symbol ':'
       value <- valueParser
-      optional (symbol '\r')
-      symbol '\n'
+      token "\r\n"
       return (key, value)
 
     -- You can't tell me that this is better code.
@@ -64,7 +70,7 @@ parseCalendar = do
   summary <- requireString "SUMMARY"
   symbol (StringToken "END" "VEVENT")
   symbol (StringToken "END" "VCALENDAR")
-  return $ Calendar [StringToken "PRODID" prodid] []
+  return $ Calendar [VersionToken, StringToken "PRODID" prodid] [Event uid stamp start end summary]
   where
     requireString :: String -> Parser Token String
     requireString key = satisfy (\(StringToken k v) -> key == k) <&> strValue
@@ -74,16 +80,45 @@ parseCalendar = do
     requireDateTime key = satisfy f <&> dtValue
       where
         f (DateTimeToken k v) = key == k
-        f (StringToken _ _) = False
+        f _ = False
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
 
 -- Exercise 8
+-- We don't call `hSetNewlineMode` because this is already called in the main function.
 readCalendar :: FilePath -> IO (Maybe Calendar)
-readCalendar fp = readFile fp <&> recognizeCalendar
+readCalendar fp = openFile fp ReadMode >>= hGetContents <&> recognizeCalendar
+
+-- Why not just?
+-- readCalendar fp = readFile fp <&> recognizeCalendar
 
 -- Exercise 9
 -- DO NOT use a derived Show instance. Your printing style needs to be nicer than that :)
 printCalendar :: Calendar -> String
-printCalendar = undefined
+printCalendar (Calendar props events) =
+  intercalate
+    "\r\n"
+    ( ["BEGIN:VCALENDAR"]
+        ++ map printProp props
+        ++ map printEvent events
+        ++ ["END:VCALENDAR\r\n"] -- Include trailing newline
+    )
+  where
+    printProp :: Token -> String
+    printProp (StringToken k v) = k ++ ":" ++ v
+    printProp (DateTimeToken k v) = k ++ ":" ++ printDateTime v
+    printProp VersionToken = "VERSION:2.0"
+
+    printEvent :: Event -> String
+    printEvent (Event uid stamp start end sum) =
+      intercalate
+        "\r\n"
+        [ "BEGIN:VEVENT",
+          "UID:" ++ uid,
+          "DTSTAMP:" ++ printDateTime stamp,
+          "DTSTART:" ++ printDateTime start,
+          "DTEND:" ++ printDateTime end,
+          "SUMMARY:" ++ sum,
+          "END:VEVENT"
+        ]
