@@ -75,17 +75,27 @@ parseCalendar :: Parser Token Calendar
 parseCalendar = do
   symbol (BeginToken "VCALENDAR")
   symbol VersionToken
-  prodid <- satisfy (stringToken ProdIdToken)
+  prodid <- satisfyStr ProdIdToken
   symbol (BeginToken "VEVENT")
-  (UidToken uid) <- satisfy (stringToken UidToken)
-  (DtStampToken dtstamp) <- satisfy (dateTimeToken DtStampToken)
-  (DtStartToken dtstart) <- satisfy (dateTimeToken DtStartToken)
-  (DtEndToken dtend) <- satisfy (dateTimeToken DtEndToken)
-  (SummaryToken summary) <- satisfy (stringToken SummaryToken)
+  uid <- satisfyStr UidToken
+  dtstamp <- satisfyDt DtStampToken
+  dtstart <- satisfyDt DtStartToken
+  dtend <- satisfyDt DtEndToken
+  summary <- satisfyStr SummaryToken
   symbol (EndToken "VEVENT")
   symbol (EndToken "VCALENDAR")
-  return $ Calendar [prodid] [Event uid dtstamp dtstart dtend "summary"]
+  return $ Calendar [] [Event uid dtstamp dtstart dtend "summary"]
   where
+    satisfyStr :: (String -> Token) -> Parser Token String
+    satisfyStr t = do
+      x <- anySymbol
+      if stringToken t x
+        then return $ getStrVal x
+        else failp
+
+    satisfyDt :: (DateTime -> Token) -> Parser Token DateTime
+    satisfyDt = undefined
+
     nullDateTime = DateTime (Date (Year 1970) (Month 1) (Day 1)) (Time (Hour 0) (Minute 0) (Second 0)) (True)
 
     stringToken :: (String -> Token) -> Token -> Bool
@@ -104,6 +114,14 @@ parseCalendar = do
     typeMatch (DtStartToken _) (DtStartToken _) = True
     typeMatch (SummaryToken _) (SummaryToken _) = True
     typeMatch _ _ = False
+
+    getStrVal :: Token -> String
+    getStrVal (EndToken v) = v
+    getStrVal (UidToken v) = v
+    getStrVal (BeginToken v) = v
+    getStrVal (ProdIdToken v) = v
+    getStrVal (SummaryToken v) = v
+    getStrVal _ = ""
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
