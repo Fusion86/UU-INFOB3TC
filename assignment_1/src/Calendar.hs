@@ -1,6 +1,6 @@
 module Calendar where
 
-import Control.Monad (liftM2)
+import Control.Monad (liftM2, replicateM)
 import Data.Functor (($>), (<&>))
 import Data.List (intercalate, sort)
 import DateTime
@@ -12,7 +12,7 @@ import Prelude hiding (sequence, ($>), (*>), (<$), (<*))
 -- Exercise 6
 data Calendar = Calendar
   { properties :: [Token],
-    event :: [Event]
+    events :: [Event]
   }
   deriving (Eq, Ord)
 
@@ -80,15 +80,29 @@ scanCalendar = greedy parseToken
 parseCalendar :: Parser Token Calendar
 parseCalendar = do
   symbol (BeginToken "VCALENDAR")
-  symbol VersionToken
-  prodid <- satisfyStr ProdIdToken
+  props <- replicateM 2 (satisfy (stringToken ProdIdToken) <|> symbol VersionToken)
   events <- greedy parseEvent
   symbol (EndToken "VCALENDAR")
-  return $ Calendar [] events
+  return $ Calendar props events
   where
     parseEvent :: Parser Token Event
     parseEvent = do
-      symbol (BeginToken "VEVENT")
+      symbol beginToken
+      props <- many (satisfy (/= endToken))
+      symbol endToken
+
+      let sorted = sort props
+      let event = parse parseEventProps sorted
+
+      case event of
+        [] -> failp
+        (e, _) : _ -> return e
+      where
+        beginToken = BeginToken "VEVENT"
+        endToken = EndToken "VEVENT"
+
+    parseEventProps :: Parser Token Event
+    parseEventProps = do
       uid <- satisfyStr UidToken
       dtstamp <- satisfyDt DtStampToken
       dtstart <- satisfyDt DtStartToken
@@ -96,7 +110,6 @@ parseCalendar = do
       summary <- optional (satisfyStr SummaryToken)
       desc <- optional (satisfyStr DescriptionToken)
       loc <- optional (satisfyStr LocationToken)
-      symbol (EndToken "VEVENT")
       return $ Event uid dtstamp dtstart dtend summary desc loc
 
     satisfyStr :: (String -> Token) -> Parser Token String
@@ -174,8 +187,8 @@ printCalendar (Calendar props events) =
     )
   where
     printProp :: Token -> String
-    printProp VersionToken = "VERSION:2.0\r\n"
-    printProp (ProdIdToken val) = "PRODID:" ++ val ++ "\r\n"
+    printProp VersionToken = "VERSION:2.0"
+    printProp (ProdIdToken val) = "PRODID:" ++ val
     printProp _ = error "Not a property"
 
     printEvent :: Event -> String
@@ -188,7 +201,6 @@ printCalendar (Calendar props events) =
             "DTSTART:" ++ printDateTime start,
             "DTEND:" ++ printDateTime end
           ]
-            ++ ["SUMMARY:" ++ x | Just x <- [sum]]
             ++ ["SUMMARY:" ++ x | Just x <- [sum]]
             ++ ["DESCRIPTION:" ++ x | Just x <- [desc]]
             ++ ["LOCATION:" ++ x | Just x <- [loc]]
