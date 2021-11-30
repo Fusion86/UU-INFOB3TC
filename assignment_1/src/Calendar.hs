@@ -1,8 +1,8 @@
 module Calendar where
 
-import Control.Monad (liftM2)
+import Control.Monad (liftM2, replicateM)
 import Data.Functor (($>), (<&>))
-import Data.List (intercalate)
+import Data.List (find, intercalate)
 import DateTime
 import ParseLib.Abstract
 import System.IO (IOMode (ReadMode), hGetContents, openFile)
@@ -20,15 +20,14 @@ data Event = Event
     dateTimeStamp :: DateTime,
     dateTimeStart :: DateTime,
     dateTimeEnd :: DateTime,
-    summary :: String
+    summary :: Maybe String,
+    description :: Maybe String,
+    location :: Maybe String
   }
   deriving (Eq, Ord)
 
 -- Exercise 7
-data Token
-  = StringToken {key :: String, strValue :: String}
-  | DateTimeToken {key :: String, dtValue :: DateTime}
-  | VersionToken
+data Token = Token {key :: String, value :: String}
   deriving (Eq, Ord)
 
 scanCalendar :: Parser Char [Token]
@@ -37,50 +36,63 @@ scanCalendar = greedy parseToken
     notNewline = satisfy (\c -> c /= '\r' && c /= '\n')
 
     parseToken :: Parser Char Token
-    parseToken = parseKeyDateTimeToken <|> parseKeyStringToken
-
-    parseKeyWithValue :: Parser Char s -> Parser Char (String, s)
-    parseKeyWithValue valueParser = do
+    parseToken = do
       key <- greedy $ satisfy (/= ':')
       symbol ':'
-      value <- valueParser
-      token "\r\n"
-      return (key, value)
-
-    -- You can't tell me that this is better code.
-    -- parseKeyWithValue :: Parser Char s -> Parser Char (String, s)
-    -- parseKeyWithValue valueParser = liftM2 (,) (greedy (satisfy (/= ':')) <* symbol ':') (valueParser <* optional (symbol '\r') <* symbol '\n')
-
-    parseKeyStringToken :: Parser Char Token
-    parseKeyStringToken = parseKeyWithValue (greedy notNewline) <&> uncurry StringToken
-
-    parseKeyDateTimeToken :: Parser Char Token
-    parseKeyDateTimeToken = parseKeyWithValue parseDateTime <&> uncurry DateTimeToken
+      value <- greedy notNewline
+      token "\r\n" -- According to the spec CRLF is required.
+      return (Token key value)
 
 parseCalendar :: Parser Token Calendar
 parseCalendar = do
-  symbol (StringToken "BEGIN" "VCALENDAR")
-  symbol (StringToken "VERSION" "2.0")
-  prodid <- requireString "PRODID"
-  symbol (StringToken "BEGIN" "VEVENT")
-  uid <- requireString "UID"
-  stamp <- requireDateTime "DTSTAMP"
-  start <- requireDateTime "DTSTART"
-  end <- requireDateTime "DTEND"
-  summary <- requireString "SUMMARY"
-  symbol (StringToken "END" "VEVENT")
-  symbol (StringToken "END" "VCALENDAR")
-  return $ Calendar [VersionToken, StringToken "PRODID" prodid] [Event uid stamp start end summary]
+  symbol (Token "BEGIN" "VCALENDAR")
+  props <- replicateM 2 (requireKey "PRODID" <|> requireKey "VERSION")
+  events <- greedy parseEvent
+  symbol (Token "END" "VCALENDAR")
+  return $ Calendar props events
   where
-    requireString :: String -> Parser Token String
-    requireString key = satisfy (\(StringToken k v) -> key == k) <&> strValue
+    requireKey :: String -> Parser Token Token
+    requireKey k = satisfy $ compareKey k
 
-    -- Why do we have to use a helper function here whereas a lambda is sufficient in the above case???
-    requireDateTime :: String -> Parser Token DateTime
-    requireDateTime key = satisfy f <&> dtValue
+    compareKey :: String -> Token -> Bool
+    compareKey k token = key token == k
+
+    parseEvent :: Parser Token Event
+    parseEvent = do
+      props <- pack beginEvent eventProps endEvent
+
+      let uid = getRequiredProp "UID" props
+      let stampStr = getRequiredProp "DTSTAMP" props
+      let startStr = getRequiredProp "DTSTART" props
+      let endStr = getRequiredProp "DTEND" props
+
+      let stamp = run parseDateTime stampStr 
+
+      return $ Event uid undefined undefined undefined Nothing Nothing Nothing
       where
-        f (DateTimeToken k v) = key == k
-        f _ = False
+        getRequiredProp :: String -> [Token] -> String
+        getRequiredProp k tokens = case getProp k tokens of
+          Just x -> x
+          Nothing -> error "required property '" ++ k ++ "' is missing."
+
+        getProp :: String -> [Token] -> Maybe String
+        getProp key tokens =
+          case find (compareKey key) tokens of
+            Just x -> Just $ value x
+            _ -> Nothing
+
+        beginEvent = symbol (Token "BEGIN" "VEVENT")
+        endEvent = symbol (Token "END" "VEVENT")
+
+        eventProps =
+          greedy $
+            requireKey "UID"
+              <|> requireKey "DTSTAMP"
+              <|> requireKey "DTSTART"
+              <|> requireKey "DTEND"
+              <|> requireKey "SUMMARY"
+              <|> requireKey "DESCRIPTION"
+              <|> requireKey "LOCATION"
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
@@ -106,12 +118,10 @@ printCalendar (Calendar props events) =
     )
   where
     printProp :: Token -> String
-    printProp (StringToken k v) = k ++ ":" ++ v
-    printProp (DateTimeToken k v) = k ++ ":" ++ printDateTime v
-    printProp VersionToken = "VERSION:2.0"
+    printProp (Token k v) = k ++ ":" ++ v
 
     printEvent :: Event -> String
-    printEvent (Event uid stamp start end sum) =
+    printEvent (Event uid stamp start end sum desc loc) =
       intercalate
         "\r\n"
         [ "BEGIN:VEVENT",
@@ -119,6 +129,6 @@ printCalendar (Calendar props events) =
           "DTSTAMP:" ++ printDateTime stamp,
           "DTSTART:" ++ printDateTime start,
           "DTEND:" ++ printDateTime end,
-          "SUMMARY:" ++ sum,
+          -- "SUMMARY:" ++ sum,
           "END:VEVENT"
         ]
