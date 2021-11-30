@@ -2,7 +2,7 @@ module Calendar where
 
 import Control.Monad (liftM2)
 import Data.Functor (($>), (<&>))
-import Data.List (intercalate)
+import Data.List (intercalate, sort)
 import DateTime
 import Debug.Trace (trace)
 import ParseLib.Abstract
@@ -21,7 +21,9 @@ data Event = Event
     dateTimeStamp :: DateTime,
     dateTimeStart :: DateTime,
     dateTimeEnd :: DateTime,
-    summary :: String
+    summary :: Maybe String,
+    description :: Maybe String,
+    location :: Maybe String
   }
   deriving (Eq, Ord)
 
@@ -35,6 +37,8 @@ data Token
   | DtStartToken DateTime
   | DtEndToken DateTime
   | SummaryToken String
+  | DescriptionToken String
+  | LocationToken String
   | EndToken String
   deriving (Eq, Ord)
 
@@ -54,6 +58,8 @@ scanCalendar = greedy parseToken
         <|> parseKeyDateTimeToken DtStartToken "DTSTART"
         <|> parseKeyDateTimeToken DtEndToken "DTEND"
         <|> parseKeyStringToken SummaryToken "SUMMARY"
+        <|> parseKeyStringToken DescriptionToken "DESCRIPTION"
+        <|> parseKeyStringToken LocationToken "LOCATION"
         <|> parseKeyStringToken EndToken "END"
 
     parseKeyWithValue :: String -> Parser Char s -> Parser Char s
@@ -76,16 +82,23 @@ parseCalendar = do
   symbol (BeginToken "VCALENDAR")
   symbol VersionToken
   prodid <- satisfyStr ProdIdToken
-  symbol (BeginToken "VEVENT")
-  uid <- satisfyStr UidToken
-  dtstamp <- satisfyDt DtStampToken
-  dtstart <- satisfyDt DtStartToken
-  dtend <- satisfyDt DtEndToken
-  summary <- satisfyStr SummaryToken
-  symbol (EndToken "VEVENT")
+  events <- greedy parseEvent
   symbol (EndToken "VCALENDAR")
-  return $ Calendar [] [Event uid dtstamp dtstart dtend "summary"]
+  return $ Calendar [] events
   where
+    parseEvent :: Parser Token Event
+    parseEvent = do
+      symbol (BeginToken "VEVENT")
+      uid <- satisfyStr UidToken
+      dtstamp <- satisfyDt DtStampToken
+      dtstart <- satisfyDt DtStartToken
+      dtend <- satisfyDt DtEndToken
+      summary <- optional (satisfyStr SummaryToken)
+      desc <- optional (satisfyStr DescriptionToken)
+      loc <- optional (satisfyStr LocationToken)
+      symbol (EndToken "VEVENT")
+      return $ Event uid dtstamp dtstart dtend summary desc loc
+
     satisfyStr :: (String -> Token) -> Parser Token String
     satisfyStr t = do
       x <- anySymbol
@@ -94,9 +107,13 @@ parseCalendar = do
         else failp
 
     satisfyDt :: (DateTime -> Token) -> Parser Token DateTime
-    satisfyDt = undefined
+    satisfyDt t = do
+      x <- anySymbol
+      if dateTimeToken t x
+        then return $ getDtVal x
+        else failp
 
-    nullDateTime = DateTime (Date (Year 1970) (Month 1) (Day 1)) (Time (Hour 0) (Minute 0) (Second 0)) (True)
+    nullDateTime = DateTime (Date (Year 1970) (Month 1) (Day 1)) (Time (Hour 0) (Minute 0) (Second 0)) True
 
     stringToken :: (String -> Token) -> Token -> Bool
     stringToken ctor = typeMatch $ ctor ""
@@ -113,6 +130,8 @@ parseCalendar = do
     typeMatch (DtStampToken _) (DtStampToken _) = True
     typeMatch (DtStartToken _) (DtStartToken _) = True
     typeMatch (SummaryToken _) (SummaryToken _) = True
+    typeMatch (DescriptionToken _) (DescriptionToken _) = True
+    typeMatch (LocationToken _) (LocationToken _) = True
     typeMatch _ _ = False
 
     getStrVal :: Token -> String
@@ -121,7 +140,15 @@ parseCalendar = do
     getStrVal (BeginToken v) = v
     getStrVal (ProdIdToken v) = v
     getStrVal (SummaryToken v) = v
-    getStrVal _ = ""
+    getStrVal (DescriptionToken v) = v
+    getStrVal (LocationToken v) = v
+    getStrVal _ = error "Token value is not a string"
+
+    getDtVal :: Token -> DateTime
+    getDtVal (DtStampToken v) = v
+    getDtVal (DtStartToken v) = v
+    getDtVal (DtEndToken v) = v
+    getDtVal _ = error "Token value is not a DateTime"
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
@@ -140,11 +167,11 @@ printCalendar :: Calendar -> String
 printCalendar (Calendar props events) =
   intercalate
     "\r\n"
-    [ "BEGIN:VCALENDAR",
-      concatMap printProp props,
-      concatMap printEvent events,
-      "END:VCALENDAR\r\n" -- Include trailing newline
-    ]
+    ( ["BEGIN:VCALENDAR"]
+        ++ map printProp props
+        ++ map printEvent events
+        ++ ["END:VCALENDAR\r\n"] -- Include trailing newline
+    )
   where
     printProp :: Token -> String
     printProp VersionToken = "VERSION:2.0\r\n"
@@ -152,14 +179,18 @@ printCalendar (Calendar props events) =
     printProp _ = error "Not a property"
 
     printEvent :: Event -> String
-    printEvent (Event uid stamp start end sum) =
+    printEvent (Event uid stamp start end sum desc loc) =
       intercalate
         "\r\n"
-        [ "BEGIN:VEVENT",
-          "UID:" ++ uid,
-          "DTSTAMP:" ++ printDateTime stamp,
-          "DTSTART:" ++ printDateTime start,
-          "DTEND:" ++ printDateTime end,
-          "SUMMARY:" ++ sum,
-          "END:VEVENT"
-        ]
+        ( [ "BEGIN:VEVENT",
+            "UID:" ++ uid,
+            "DTSTAMP:" ++ printDateTime stamp,
+            "DTSTART:" ++ printDateTime start,
+            "DTEND:" ++ printDateTime end
+          ]
+            ++ ["SUMMARY:" ++ x | Just x <- [sum]]
+            ++ ["SUMMARY:" ++ x | Just x <- [sum]]
+            ++ ["DESCRIPTION:" ++ x | Just x <- [desc]]
+            ++ ["LOCATION:" ++ x | Just x <- [loc]]
+            ++ ["END:VEVENT"]
+        )
