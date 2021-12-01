@@ -90,14 +90,29 @@ checkDateTime (DateTime (Date y m d) (Time hh mm ss) _) =
     && validRange 0 59 (runSecond ss)
   where
     validRange min max actual = min <= actual && actual <= max
-    validDay y m d = validRange 0 (daysInMonth y m d) d
-    daysInMonth y m d
-      | m == 2 = if isLeapYear y then 29 else 28
-      | m `elem` [1, 3, 5, 7, 8, 10, 12] = 31
-      | otherwise = 30
-    isLeapYear y = divBy 400 || (divBy 4 && not (divBy 100))
-      where
-        divBy x = mod y x == 0
+    validDay y m d = validRange 0 (daysInMonth y m) d
+
+daysInMonth y m
+  | m == 2 = if isLeapYear y then 29 else 28
+  | m `elem` [1, 3, 5, 7, 8, 10, 12] = 31
+  | otherwise = 30
+
+isLeapYear y = divBy 400 || (divBy 4 && not (divBy 100))
+  where
+    divBy x = mod y x == 0
 
 parseCheck :: [Char] -> Maybe Bool
 parseCheck s = checkDateTime <$> run parseDateTime s
+
+dateTimeToTimestamp :: DateTime -> Int
+dateTimeToTimestamp
+  (DateTime (Date (Year y) (Month m) (Day d)) (Time (Hour hh) (Minute mm) (Second ss)) _)
+    | y > 1970 = seconds
+    | otherwise = error "time did not exist before 1970"
+    where
+      yearDays = sum $ map (\x -> if isLeapYear x then 366 else 365) [1970 .. y]
+      monthDays = sum $ map (daysInMonth y) [1 .. m]
+      days = yearDays + monthDays + d
+      hours = days * 24 + hh
+      minutes = hours * 60 + mm
+      seconds = minutes * 60 + ss
