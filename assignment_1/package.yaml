@@ -22,6 +22,7 @@ dependencies:
   - base >=4.14
   - boxes
   - containers
+  - split
   - uu-tc == 2015.1.1
 
 library:

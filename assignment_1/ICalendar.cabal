@@ -24,6 +24,7 @@ library
     , base >=4.14
     , boxes
     , containers
+    , split
     , uu-tc ==2015.1.1
   default-language: Haskell2010
 
@@ -40,5 +41,6 @@ executable ICalendar-exe
     , base >=4.14
     , boxes
     , containers
+    , split
     , uu-tc ==2015.1.1
   default-language: Haskell2010
