@@ -1,6 +1,6 @@
 module Calendar where
 
-import Control.Monad (liftM2, replicateM)
+import Control.Monad (foldM, liftM2, replicateM)
 import Data.Functor (($>), (<&>))
 import Data.List (intercalate, sort)
 import DateTime
@@ -80,88 +80,36 @@ scanCalendar = greedy parseToken
 parseCalendar :: Parser Token Calendar
 parseCalendar = do
   symbol (BeginToken "VCALENDAR")
-  props <- replicateM 2 (satisfy (stringToken ProdIdToken) <|> symbol VersionToken)
+  potProps <- replicateM 2 anySymbol
+  props <- maybe failp return (constructProps (sort potProps))
   events <- greedy parseEvent
   symbol (EndToken "VCALENDAR")
   return $ Calendar props events
   where
+    constructProps :: [Token] -> Maybe [Token]
+    constructProps xs@[VersionToken, ProdIdToken _] = Just xs
+    constructProps _ = Nothing
+
     parseEvent :: Parser Token Event
     parseEvent = do
       symbol beginToken
       props <- many (satisfy (/= endToken))
       symbol endToken
-
-      let sorted = sort props
-      let event = parse parseEventProps sorted
-
-      case event of
-        [] -> failp
-        (e, _) : _ -> return e
+      maybe failp return (constructEvent (sort props))
       where
         beginToken = BeginToken "VEVENT"
         endToken = EndToken "VEVENT"
 
-    parseEventProps :: Parser Token Event
-    parseEventProps = do
-      uid <- satisfyStr UidToken
-      dtstamp <- satisfyDt DtStampToken
-      dtstart <- satisfyDt DtStartToken
-      dtend <- satisfyDt DtEndToken
-      summary <- optional (satisfyStr SummaryToken)
-      desc <- optional (satisfyStr DescriptionToken)
-      loc <- optional (satisfyStr LocationToken)
-      return $ Event uid dtstamp dtstart dtend summary desc loc
-
-    satisfyStr :: (String -> Token) -> Parser Token String
-    satisfyStr t = do
-      x <- anySymbol
-      if stringToken t x
-        then return $ getStrVal x
-        else failp
-
-    satisfyDt :: (DateTime -> Token) -> Parser Token DateTime
-    satisfyDt t = do
-      x <- anySymbol
-      if dateTimeToken t x
-        then return $ getDtVal x
-        else failp
-
-    nullDateTime = DateTime (Date (Year 1970) (Month 1) (Day 1)) (Time (Hour 0) (Minute 0) (Second 0)) True
-
-    stringToken :: (String -> Token) -> Token -> Bool
-    stringToken ctor = typeMatch $ ctor ""
-
-    dateTimeToken :: (DateTime -> Token) -> Token -> Bool
-    dateTimeToken ctor = typeMatch $ ctor nullDateTime
-
-    typeMatch :: Token -> Token -> Bool
-    typeMatch (EndToken _) (EndToken _) = True
-    typeMatch (UidToken _) (UidToken _) = True
-    typeMatch (BeginToken _) (BeginToken _) = True
-    typeMatch (DtEndToken _) (DtEndToken _) = True
-    typeMatch (ProdIdToken _) (ProdIdToken _) = True
-    typeMatch (DtStampToken _) (DtStampToken _) = True
-    typeMatch (DtStartToken _) (DtStartToken _) = True
-    typeMatch (SummaryToken _) (SummaryToken _) = True
-    typeMatch (DescriptionToken _) (DescriptionToken _) = True
-    typeMatch (LocationToken _) (LocationToken _) = True
-    typeMatch _ _ = False
-
-    getStrVal :: Token -> String
-    getStrVal (EndToken v) = v
-    getStrVal (UidToken v) = v
-    getStrVal (BeginToken v) = v
-    getStrVal (ProdIdToken v) = v
-    getStrVal (SummaryToken v) = v
-    getStrVal (DescriptionToken v) = v
-    getStrVal (LocationToken v) = v
-    getStrVal _ = error "Token value is not a string"
-
-    getDtVal :: Token -> DateTime
-    getDtVal (DtStampToken v) = v
-    getDtVal (DtStartToken v) = v
-    getDtVal (DtEndToken v) = v
-    getDtVal _ = error "Token value is not a DateTime"
+    constructEvent :: [Token] -> Maybe Event
+    constructEvent ((UidToken uid) : (DtStampToken dtstamp) : (DtStartToken dtstart) : (DtEndToken dtend) : opts) =
+      foldM f (Event uid dtstamp dtstart dtend Nothing Nothing Nothing) opts
+      where
+        f :: Event -> Token -> Maybe Event
+        f e@Event {summary = Nothing} (SummaryToken str) = Just e {summary = Just str}
+        f e@Event {description = Nothing} (DescriptionToken str) = Just $ e {description = Just str}
+        f e@Event {location = Nothing} (LocationToken str) = Just $ e {location = Just str}
+        f e _ = Nothing
+    constructEvent _ = Nothing
 
 recognizeCalendar :: String -> Maybe Calendar
 recognizeCalendar s = run scanCalendar s >>= run parseCalendar
