@@ -3,29 +3,41 @@ module Algebra where
 import Model
 
 -- Exercise 5
-type Algebra r =
-  ( [r] -> r, -- program
-    String -> [r] -> r, -- rule
-    r, -- go
-    r, -- take command
-    r, -- mark command
-    r, -- nothing command
-    r -> r, -- turn command
-    r -> [r] -> r, -- case command
-    String -> r, -- function call
-    r, -- left dir
-    r, -- right dir
-    r, -- front dir
-    r -> [r] -> r, -- alt
-    r, -- empty pattern
-    r, -- lambda pattern
-    r, -- debris pattern
-    r, -- asteroid pattern
-    r, -- boundary pattern
-    r -- underscore pattern
+
+type Algebra p r c d a pat =
+  ( -- program
+    [r] -> p, --
+
+    -- rule
+    String -> [c] -> r, --
+
+    -- commands
+    c, -- go
+    c, -- take command
+    c, -- mark command
+    c, -- nothing command
+    d -> c, -- turn command
+    d -> [a] -> c, -- case command
+    String -> c, -- function call
+
+    -- direction
+    d, -- left dir
+    d, -- right dir
+    d, -- front dir
+
+    -- alt
+    pat -> [c] -> a, --
+
+    -- patterns
+    pat, -- empty pattern
+    pat, -- lambda pattern
+    pat, -- debris pattern
+    pat, -- asteroid pattern
+    pat, -- boundary pattern
+    pat -- underscore pattern
   )
 
-fold :: Algebra r -> Program -> r
+fold :: Algebra p r c d a pat -> Program -> p
 fold
   ( prog,
     rule,
@@ -73,27 +85,25 @@ fold
 checkProgram :: Program -> Bool
 checkProgram = fold algebra
   where
-    algebra :: Algebra String
+    algebra :: Algebra Bool b c d e etc
     algebra =
-      ( prog,
-        const $ const True,
-        True,
-        True,
-        True,
-        True,
-        const True,
-        const $ const True,
-        const True,
-        True,
-        True,
-        True,
-        const $ const True,
-        True,
-        True,
-        True,
-        True,
-        True,
-        True
+      ( undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined
       )
-    prog :: [Bool] -> Bool
-    prog = undefined
