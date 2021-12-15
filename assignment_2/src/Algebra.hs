@@ -5,12 +5,12 @@ import Model
 
 -- Exercise 5
 
-type Algebra p r c d a pat =
+type Algebra p r i c d a pat =
   ( -- program
     [r] -> p, --
 
     -- rule
-    String -> [c] -> r, --
+    i -> [c] -> r, --
 
     -- commands
     c, -- go
@@ -19,7 +19,7 @@ type Algebra p r c d a pat =
     c, -- nothing command
     d -> c, -- turn command
     d -> [a] -> c, -- case command
-    String -> c, -- function call
+    Identifier -> c, -- function call
 
     -- direction
     d, -- left dir
@@ -35,10 +35,13 @@ type Algebra p r c d a pat =
     pat, -- debris pattern
     pat, -- asteroid pattern
     pat, -- boundary pattern
-    pat -- underscore pattern
+    pat, -- underscore pattern
+
+    -- identifier
+    Identifier -> i --
   )
 
-fold :: Algebra p r c d a pat -> Program -> p
+fold :: Algebra p r i c d a pat -> Program -> p
 fold
   ( prog,
     rule,
@@ -58,11 +61,12 @@ fold
     debris,
     asteroid,
     boundary,
-    underscore
+    underscore,
+    identifier
     ) = f
     where
       f (Program rules) = prog (map fr rules)
-      fr (Rule ident rules) = rule ident (map fc rules)
+      fr (Rule ident rules) = rule (fi ident) (map fc rules)
       fc GoCommand = go
       fc TakeCommand = take
       fc MarkCommand = mark
@@ -80,6 +84,7 @@ fold
       fp AsteroidPattern = asteroid
       fp BoundaryPattern = boundary
       fp UnderscorePattern = underscore
+      fi ident = identifier ident
 
 -- Exercise 6
 
@@ -89,8 +94,8 @@ data None = None
 checkProgram :: Program -> Bool
 checkProgram = fold algebra
   where
-    --         Algebra p    r                    c        d    a               pat
-    algebra :: Algebra Bool (String, [[String]]) [String] None (Pattern, [String]) Pattern
+    --         Algebra p    r                    i      c        d    a               pat
+    algebra :: Algebra Bool (String, [[String]]) String [String] None (Pattern, [String]) Pattern
     algebra =
       ( program,
         (,), -- rule
@@ -100,7 +105,7 @@ checkProgram = fold algebra
         [], -- nothing
         const [], -- turn
         case',
-        (: []),
+        \(Identifier str) -> [str],
         None,
         None,
         None,
@@ -110,7 +115,8 @@ checkProgram = fold algebra
         DebrisPattern,
         AsteroidPattern,
         BoundaryPattern,
-        UnderscorePattern
+        UnderscorePattern,
+        \(Identifier str) -> str
       )
       where
         -- Check whether a program is valid

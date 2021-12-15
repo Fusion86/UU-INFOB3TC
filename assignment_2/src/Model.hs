@@ -29,7 +29,9 @@ data Token
 -- Exercise 2
 newtype Program = Program [Rule] deriving (Show)
 
-data Rule = Rule String [Command] deriving (Show)
+newtype Identifier = Identifier String deriving (Show)
+
+data Rule = Rule Identifier [Command] deriving (Show)
 
 data Command
   = GoCommand
@@ -38,7 +40,7 @@ data Command
   | NothingCommand
   | TurnCommand Direction
   | CaseCommand Direction [Alt]
-  | FunctionCall String
+  | FunctionCall Identifier
   deriving (Show)
 
 data Direction = LeftDirection | RightDirection | FrontDirection deriving (Show)
