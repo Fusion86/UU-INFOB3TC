@@ -1,5 +1,6 @@
 module Algebra where
 
+import Data.List (nub, sort)
 import Model
 
 -- Exercise 5
@@ -82,28 +83,55 @@ fold
 
 -- Exercise 6
 
+-- Gimme void
+data None = None
+
 checkProgram :: Program -> Bool
 checkProgram = fold algebra
   where
-    algebra :: Algebra Bool b c d e etc
+    --         Algebra p    r                    c        d    a               pat
+    algebra :: Algebra Bool (String, [[String]]) [String] None (Pattern, [String]) Pattern
     algebra =
-      ( undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined
+      ( program,
+        (,), -- rule
+        [], -- go
+        [], -- take
+        [], -- mark
+        [], -- nothing
+        const [], -- turn
+        case',
+        (: []),
+        None,
+        None,
+        None,
+        \pat cmds -> (pat, concat cmds),
+        EmptyPattern,
+        LambdaPattern,
+        DebrisPattern,
+        AsteroidPattern,
+        BoundaryPattern,
+        UnderscorePattern
       )
+      where
+        -- Check whether a program is valid
+        program :: [(String, [[String]])] -> Bool
+        program xs =
+          "start" `elem` ruleNames -- There is at least one start function
+            && ruleNames == nub ruleNames -- No rule is defined twice
+            && all (`elem` ruleNames) funcCalls -- There are no calls to undefined functions
+          where
+            ruleNames = map fst xs
+            funcCalls = concat $ concatMap snd xs
+
+        case' :: None -> [(Pattern, [String])] -> [String]
+        case' _ pats
+          | checkPatterns = concatMap snd pats
+          | otherwise = ["!error"] -- kinda shitty but it works
+          where
+            cases = map fst pats
+            checkPatterns
+              -- Always fails if there are dupes
+              | cases /= nub cases = False
+              -- Always valid if there is an underscore pattern
+              | UnderscorePattern `elem` cases = True
+              | otherwise = length cases == 5

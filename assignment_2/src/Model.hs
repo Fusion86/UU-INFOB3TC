@@ -52,4 +52,4 @@ data Pattern
   | AsteroidPattern
   | BoundaryPattern
   | UnderscorePattern
-  deriving (Show)
+  deriving (Eq, Show)
