@@ -88,14 +88,11 @@ fold
 
 -- Exercise 6
 
--- Gimme void
-data None = None
-
 checkProgram :: Program -> Bool
 checkProgram = fold algebra
   where
     --         Algebra p    r                    i      c        d    a               pat
-    algebra :: Algebra Bool (String, [[String]]) String [String] None (Pattern, [String]) Pattern
+    algebra :: Algebra Bool (String, [[String]]) String [String] () (Pattern, [String]) Pattern
     algebra =
       ( program,
         (,), -- rule
@@ -105,10 +102,10 @@ checkProgram = fold algebra
         [], -- nothing
         const [], -- turn
         case',
-        \(Identifier str) -> [str],
-        None,
-        None,
-        None,
+        \(Identifier str) -> [str], 
+        (), -- or undefined, doesn't matter
+        (),
+        (),
         \pat cmds -> (pat, concat cmds),
         EmptyPattern,
         LambdaPattern,
@@ -129,7 +126,7 @@ checkProgram = fold algebra
             ruleNames = map fst xs
             funcCalls = concat $ concatMap snd xs
 
-        case' :: None -> [(Pattern, [String])] -> [String]
+        case' :: () -> [(Pattern, [String])] -> [String]
         case' _ pats
           | checkPatterns = concatMap snd pats
           | otherwise = ["!error"] -- kinda shitty but it works
