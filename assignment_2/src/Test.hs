@@ -16,7 +16,7 @@ test = do
     testCheckProgram :: String -> IO ()
     testCheckProgram f = do
       str <- readFile f
-      let res = checkProgram (parse (alexScanTokens str))
+      let res = checkProgram (parseProgram (alexScanTokens str))
           resStr = if res then "succeeded" else "failed"
       print $ "checkProgram: \"" ++ f ++ "\" " ++ resStr
       return ()

@@ -21,7 +21,8 @@ library
                        containers,
                        directory,
                        uu-tc,
-                       array
+                       array,
+                       split
 
   build-tool-depends:  alex:alex,
                        happy:happy
