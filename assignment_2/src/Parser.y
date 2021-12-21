@@ -29,13 +29,11 @@ import Model
   "Asteroid"        { AsteroidToken }
   "Boundary"        { BoundaryToken }
   "_"               { UnderscoreToken }
-  IdentToken        { IdentifierToken $$ }
+  Ident             { IdentifierToken $$ }
 
 %%
 
 Program : Rules { Program $1 }
-
-Identifier : IdentToken { Identifier $1 }
 
 Rules : Rules_ { reverse $1 }
 
@@ -43,7 +41,7 @@ Rules_ :
   {- empty -} { [] }
   | Rules_ Rule { $2 : $1 }
   
-Rule : Identifier "->" Commands "." { Rule $1 $3 }
+Rule : Ident "->" Commands "." { Rule $1 $3 }
 
 Commands : Commands_ { reverse $1 }
 
@@ -59,7 +57,7 @@ Command :
   | "nothing" { NothingCommand }
   | "turn" Direction { TurnCommand $2 }
   | "case" Direction "of" Alts "end" { CaseCommand $2 $4 }
-  | Identifier { FunctionCall $1 }
+  | Ident { FunctionCall $1 }
 
 Direction :
     "left" { LeftDirection }

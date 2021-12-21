@@ -5,12 +5,12 @@ import Model
 
 -- Exercise 5
 
-type Algebra p r i c d a pat =
+type Algebra p r c d a pat =
   ( -- program
     [r] -> p, --
 
     -- rule
-    i -> [c] -> r, --
+    String -> [c] -> r, --
 
     -- commands
     c, -- go
@@ -19,7 +19,7 @@ type Algebra p r i c d a pat =
     c, -- nothing command
     d -> c, -- turn command
     d -> [a] -> c, -- case command
-    Identifier -> c, -- function call
+    String -> c, -- function call
 
     -- direction
     d, -- left dir
@@ -35,13 +35,10 @@ type Algebra p r i c d a pat =
     pat, -- debris pattern
     pat, -- asteroid pattern
     pat, -- boundary pattern
-    pat, -- underscore pattern
-
-    -- identifier
-    Identifier -> i --
+    pat -- underscore pattern
   )
 
-fold :: Algebra p r i c d a pat -> Program -> p
+fold :: Algebra p r c d a pat -> Program -> p
 fold
   ( prog,
     rule,
@@ -61,12 +58,11 @@ fold
     debris,
     asteroid,
     boundary,
-    underscore,
-    identifier
+    underscore
     ) = f
     where
       f (Program rules) = prog (map fr rules)
-      fr (Rule ident rules) = rule (fi ident) (map fc rules)
+      fr (Rule ident rules) = rule ident (map fc rules)
       fc GoCommand = go
       fc TakeCommand = take
       fc MarkCommand = mark
@@ -84,15 +80,14 @@ fold
       fp AsteroidPattern = asteroid
       fp BoundaryPattern = boundary
       fp UnderscorePattern = underscore
-      fi ident = identifier ident
 
 -- Exercise 6
 
 checkProgram :: Program -> Bool
 checkProgram = fold algebra
   where
-    --         Algebra p    r                    i      c        d    a               pat
-    algebra :: Algebra Bool (String, [[String]]) String [String] () (Pattern, [String]) Pattern
+    --         Algebra p    r                    c        d    a               pat
+    algebra :: Algebra Bool (String, [[String]]) [String] () (Pattern, [String]) Pattern
     algebra =
       ( program,
         (,), -- rule
@@ -102,8 +97,8 @@ checkProgram = fold algebra
         [], -- nothing
         const [], -- turn
         case',
-        \(Identifier str) -> [str], 
-        (), -- or undefined, doesn't matter
+        (: []),
+        (),
         (),
         (),
         \pat cmds -> (pat, concat cmds),
@@ -112,8 +107,7 @@ checkProgram = fold algebra
         DebrisPattern,
         AsteroidPattern,
         BoundaryPattern,
-        UnderscorePattern,
-        \(Identifier str) -> str
+        UnderscorePattern
       )
       where
         -- Check whether a program is valid
