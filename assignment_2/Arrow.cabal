@@ -16,13 +16,16 @@ library
                       , Interpreter
                       , Lexer
                       , Parser
+                      , Common
+                      , Main
 
   build-depends:       base >=4.14,
                        containers,
                        directory,
                        uu-tc,
                        array,
-                       split
+                       split,
+                       pretty-simple
 
   build-tool-depends:  alex:alex,
                        happy:happy

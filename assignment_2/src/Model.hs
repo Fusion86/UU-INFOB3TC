@@ -41,7 +41,7 @@ data Command
   | FunctionCall String
   deriving (Show)
 
-data Direction = LeftDirection | RightDirection | FrontDirection deriving (Show)
+data Direction = LeftDirection | RightDirection | FrontDirection deriving (Show, Eq)
 
 data Alt = Alt Pattern [Command] deriving (Show)
 

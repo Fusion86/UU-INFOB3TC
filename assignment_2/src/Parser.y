@@ -64,10 +64,12 @@ Direction :
   | "right" { RightDirection }
   | "front" { FrontDirection }
 
-Alts :
+Alts : Alts_ { reverse $1 }
+
+Alts_ :
   {- empty -} { [] }
   | Alt { [$1] }
-  | Alts ";" Alt { $3 : $1 }
+  | Alts_ ";" Alt { $3 : $1 }
 
 Alt : Pattern "->" Commands { Alt $1 $3 }
 
