@@ -1,0 +1,50 @@
+name: Arrow
+version: 0.1.0.0
+github: "Fusion86/UU-INFOB3TC"
+license: OtherLicense
+author: "Author name here"
+maintainer: "example@example.com"
+copyright: "2021 Author name here"
+
+extra-source-files:
+  - README.md
+
+description: Please see the README on GitHub at <https://github.com/Fusion86/UU-INFOB3TC/blob/master/assignment_2/README.md>
+
+dependencies:
+  - base >= 4.14 && < 5
+  - directory
+  - containers
+  - array
+  - split
+  - pretty-simple
+  - uu-tc
+
+build-tools:
+  - alex:alex
+  - happy:happy
+
+library:
+  source-dirs: src
+
+executables:
+  arrow:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - Arrow
+
+tests:
+  test:
+    main: Test.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - Arrow

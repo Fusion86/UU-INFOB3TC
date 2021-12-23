@@ -1,4 +1,4 @@
-module Test where
+module Main where
 
 import Algebra
 import Common
@@ -9,6 +9,14 @@ import Lexer
 import ParseLib.Abstract (parse)
 import Parser
 import System.Directory (getDirectoryContents)
+
+-- Shitty tests used during development.
+main :: IO ()
+main = do
+  test
+  testDebris
+  testAdd
+  testParser
 
 test :: IO ()
 test = do
@@ -22,7 +30,7 @@ test = do
       str <- readFile f
       let res = checkProgram (parseProgram (alexScanTokens str))
           resStr = if res then "succeeded" else "failed"
-      print $ "checkProgram: \"" ++ f ++ "\" " ++ resStr
+      putStrLn $ "checkProgram: \"" ++ f ++ "\" " ++ resStr
       return ()
 
 testSourceWithSpace :: String -> String -> Pos -> Heading -> IO ()
@@ -35,19 +43,19 @@ testSourceWithSpace a b pos heading = do
       startCmds = env ! "start"
       state = ArrowState space pos heading startCmds
 
-  print "Environment:"
-  print env
-  print "" -- newline
+  putStrLn "Environment:"
+  pPrint env
+  putStrLn "" -- newline
   let res = run env state
       space = getSpace res
 
   pPrint res
 
   case getSpace res of
-    Nothing -> print "Can't print space because the program failed."
+    Nothing -> putStrLn "Can't print space because the program failed."
     Just x -> do
-      print "Space:"
-      print $ printSpace x
+      putStrLn "Space:"
+      putStrLn $ printSpace x
   return ()
   where
     getSpace (Done space _ _) = Just space

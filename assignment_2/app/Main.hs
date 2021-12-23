@@ -12,6 +12,7 @@ import Driver
 import Interpreter
 import ParseLib.Abstract
 import System.Directory (getDirectoryContents)
+import System.IO (hFlush, stdout)
 
 main :: IO ()
 main = do
@@ -21,32 +22,32 @@ main = do
       spaces = filter (".space" `isSuffixOf`) examples
       fullSpaces = map ("./examples/" ++) spaces
 
-  print "Programs:"
+  putStrLn "Programs:"
   progIdx <- pickFromList progs
   src <- readFile (fullProgs !! progIdx)
   let env = toEnvironment src
 
   case L.lookup "start" env of
-    Nothing -> print "Program does not have a start function. Exiting..."
+    Nothing -> putStrLn "Program does not have a start function. Exiting..."
     Just startFunc -> do
-      print "Spaces:"
+      putStrLn "Spaces:"
       spaceIdx <- pickFromList spaces
       spaceStr <- readFile (fullSpaces !! spaceIdx)
 
       case run parseSpace spaceStr of
-        Nothing -> print "Could't parse space. Exiting..."
+        Nothing -> putStrLn "Could't parse space. Exiting..."
         Just space -> do
           pos <- askStartCoords
 
-          print "Starting direction:"
+          putStrLn "Starting direction:"
           dirIdx <- pickFromList heading
           let dir = parseHeading (heading !! dirIdx)
               state = ArrowState space pos dir startFunc
 
-          print "Initial state:"
+          putStrLn "Initial state:"
           printArrowState state
 
-          print "Mode:"
+          putStrLn "Mode:"
           mode <- pickFromList ["Interactive", "Batch"]
 
           if mode == 0
@@ -54,7 +55,7 @@ main = do
               interactive env state
             else do
               let (space, pos, heading) = batch env state
-              print "Final state:"
+              putStrLn "Final state:"
               printArrowState (ArrowState space pos heading [])
   return ()
   where
@@ -64,14 +65,13 @@ main = do
     pickFromList :: [String] -> IO Int
     pickFromList lst = do
       -- glhf
-      foldlM (\b a -> print (show b ++ ". " ++ a) >> return (b + 1)) 1 lst
-      putStr "Choice: "
-      x <- getLine
+      foldlM (\b a -> putStrLn (show b ++ ". " ++ a) >> return (b + 1)) 1 lst
+      x <- prompt "Choice: "
       let nr = read x :: Int
       if nr > 0 && nr <= length lst
         then return $ nr - 1
         else do
-          print "Invalid choice, try again..."
+          putStrLn "Invalid choice, try again..."
           pickFromList lst
 
     parseHeading :: String -> Heading
@@ -81,12 +81,17 @@ main = do
     parseHeading "West" = West
     parseHeading x = error $ "Can't parse heading from '" ++ x ++ "'"
 
+    prompt :: String -> IO String
+    prompt text = do
+      putStr text
+      hFlush stdout
+      getLine
+
     -- Do notation is better, change my mind.
     askStartCoords :: IO Pos
     askStartCoords =
-      putStr "Enter starting coordinates y,x: "
-        >> getLine
-          >>= maybe askStartCoords return . run parseCoords
+      prompt "Enter starting coordinates y,x: "
+        >>= maybe askStartCoords return . run parseCoords
 
     run :: Parser a b -> [a] -> Maybe b
     run p d = f (parse p d)
