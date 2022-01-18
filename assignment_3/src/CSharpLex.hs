@@ -1,5 +1,6 @@
 module CSharpLex where
 
+import Common
 import Control.Monad (guard)
 import Data.Char
 import ParseLib.Abstract
@@ -33,20 +34,7 @@ data Token
 
 ----- Begin Lexer -----
 lexicalScanner :: Parser Char [Token]
-lexicalScanner = lexWhiteSpace *> greedy (lexToken <* lexWhiteSpace) <* eof
-
--- lexicalScanner =
---   do
---     lexWhiteSpace
---     x <-
---       greedy
---         ( do
---             token <- lexToken
---             lexWhiteSpace
---             return token
---         )
---     eof
---     return x
+lexicalScanner = lexDiscard *> greedy (lexToken <* lexDiscard) <* eof
 
 lexToken :: Parser Char Token
 lexToken =
@@ -114,8 +102,18 @@ lexLowerId = (\x xs -> LowerId (x : xs)) <$> satisfy isLower <*> greedy (satisfy
 lexUpperId :: Parser Char Token
 lexUpperId = (\x xs -> UpperId (x : xs)) <$> satisfy isUpper <*> greedy (satisfy isAlphaNum)
 
+lexDiscard :: Parser Char ()
+lexDiscard = () <$ greedy (lexWhiteSpace <|> lexComment)
+
 lexWhiteSpace :: Parser Char String
-lexWhiteSpace = greedy (satisfy isSpace)
+lexWhiteSpace = (: []) <$> satisfy isSpace
+
+lexComment :: Parser Char String
+lexComment = do
+  token "//"
+  x <- greedy $ satisfy ('\n' /=)
+  symbol '\n'
+  return x
 
 keyword :: String -> Parser Char String
 keyword [] = succeed ""
