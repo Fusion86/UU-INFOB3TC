@@ -1,6 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
+
 module CSharpGram where
 
 import CSharpLex
+import Common
 import ParseLib.Abstract hiding (braced, bracketed, parenthesised)
 import Prelude hiding (sequence, (*>), (<$), (<*), (<*>))
 
@@ -63,10 +66,47 @@ pStat =
   StatExpr <$> pExpr <* sSemi
     <|> StatIf <$ symbol KeyIf <*> parenthesised pExpr <*> pStat <*> optionalElse
     <|> StatWhile <$ symbol KeyWhile <*> parenthesised pExpr <*> pStat
+    <|> pFor
     <|> StatReturn <$ symbol KeyReturn <*> pExpr <* sSemi
     <|> pBlock
   where
     optionalElse = option (symbol KeyElse *> pStat) (StatBlock [])
+
+    pExprDecl = StatDecl <$> pDecl <|> StatExpr <$> pExpr
+    pExprDecls = option (listOf pExprDecl (symbol Comma)) []
+
+    pFor :: Parser Token Stat
+    pFor = do
+      symbol KeyFor
+
+      -- Commented out because we use the chad-notation below.
+      -- (init, condition, step) <-
+      --   parenthesised
+      --     ( do
+      --         init <- pExprDecls
+      --         symbol Semicolon
+      --         condition <- pExpr
+      --         symbol Semicolon
+      --         step <- pExprDecls
+
+      --         return (init, condition, step)
+      --     )
+
+      -- Chad notation, aka unreadable.
+      (init, condition, step) <- parenthesised $ (,,) <$> (pExprDecls <* symbol Semicolon) <*> (pExpr <* symbol Semicolon) <*> pExprDecls
+
+      block <- pStat
+
+      let whileBody = StatBlock (block : step)
+          whileStat = StatWhile condition whileBody
+          forStat = StatBlock (init ++ [whileStat])
+
+      return $ dbg "end of pFor" forStat
+
+-- pExprDecls:: Parser Token d
+-- pExprDecls = do
+--   stuff <- listOf pExpr (symbol Comma)
+--   return ()
 
 pExprSimple :: Parser Token Expr
 pExprSimple =

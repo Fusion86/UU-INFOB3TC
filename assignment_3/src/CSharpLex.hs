@@ -18,6 +18,7 @@ data Token
   | KeyIf
   | KeyElse
   | KeyWhile
+  | KeyFor
   | KeyReturn
   | KeyTry
   | KeyCatch
@@ -65,6 +66,7 @@ lexTerminal = choice [t <$ keyword s | (t, s) <- terminals]
         (KeyIf, "if"),
         (KeyElse, "else"),
         (KeyWhile, "while"),
+        (KeyFor, "for"),
         (KeyReturn, "return"),
         (KeyTry, "try"),
         (KeyCatch, "catch"),
