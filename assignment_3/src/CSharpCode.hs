@@ -16,12 +16,35 @@ import Prelude hiding (EQ, GT, LT)
 
 {- ORMOLU_DISABLE -}
 -- The types that we generate for each datatype: Our type variables for the algebra
-type Env = M.Map String Int
+-- type Env = M.Map String Int
 type C = Code                   -- Class
 type M = Env -> (Code, Env)                   -- Member
-type S = Env -> Int -> (Code, Env, Int)     -- Statement
+type S = Env -> (Code, Env)     -- Statement
 type E = ValueOrAddress -> Env -> Code -- Expression
 {- ORMOLU_ENABLE -}
+
+data Env = Env
+  { maxSize :: Int,
+    variables :: M.Map String Int
+  }
+  deriving (Show)
+
+addVar :: Env -> String -> Env
+addVar (Env maxSize variables) var = case M.lookup var variables of
+  Nothing -> Env newMaxSize (M.insert var (M.size variables) variables)
+  --
+  Just n -> error $ "Variable '" ++ var ++ "' is already defined in this local scope."
+  where
+    -- newMaxSize = maxSize + 1
+    newMaxSize = max maxSize (M.size variables + 1)
+
+emptyEnv :: Env
+emptyEnv = Env 0 M.empty
+
+getVar :: String -> Env -> Int
+getVar name (Env _ vars) = case M.lookup name vars of
+  Nothing -> error $ "No variable '" ++ name ++ "' exists."
+  Just n -> n
 
 codeAlgebra :: CSharpAlgebra C M S E
 codeAlgebra =
@@ -35,7 +58,7 @@ codeClass :: String -> [M] -> C
 codeClass c ms = [Bsr "main", HALT] ++ concatMap f ms
   where
     f :: M -> Code
-    f x = fst (x M.empty)
+    f x = fst (x emptyEnv)
 
 codeMember :: (Decl -> M, Type -> String -> [Decl] -> S -> M)
 codeMember = (fMembDecl, fMembMeth)
@@ -44,33 +67,47 @@ codeMember = (fMembDecl, fMembMeth)
     fMembDecl d env = trace "warning: member variables are not implemented!" ([], env)
 
     fMembMeth :: Type -> String -> [Decl] -> S -> M
-    -- TODO: Implement local vars using LINK and UNLINK.
-    fMembMeth t x ps s env = trace ("envMaxSize: " ++ show envMaxSize) ([LABEL x] ++ code ++ [RET], M.empty)
+    -- LINK and UNLINK should actually be implemented in fStatBlock, but we don't get paid enough to do so.
+    fMembMeth t x ps s env = trace ("envMaxSize: " ++ show envMaxSize) ([LABEL x, LINK envMaxSize] ++ code ++ [UNLINK, RET], emptyEnv)
       where
-        (code, newEnv, envMaxSize) = s env
+        envMaxSize = maxSize newEnv
+        (code, newEnv) = s env
 
+codeStatement ::
+  ( Decl -> S,
+    E -> S,
+    E -> S -> S -> S,
+    E -> S -> S,
+    E -> S,
+    [Env -> (Code, Env)] -> Env -> (Code, Env)
+  )
 codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBlock)
   where
     fStatDecl :: Decl -> S
-    fStatDecl (Decl t var) env envSize = ([], newEnv, envSize + 1)
-      where
-        newEnv = M.insert var (M.size env) env
+    fStatDecl (Decl t var) env = ([], addVar env var)
+
     fStatExpr :: E -> S
     fStatExpr e env = (e Value env ++ [pop], env)
 
     fStatIf :: E -> S -> S -> S
-    fStatIf e s1 s2 env = (c ++ [BRF (n1 + 2)] ++ fst stat1 ++ [BRA n2] ++ fst stat2, env)
+    fStatIf e s1 s2 env = (c ++ [BRF (n1 + 2)] ++ fst stat1 ++ [BRA n2] ++ fst stat2, newEnv)
       where
         c = e Value env
         (n1, n2) = (codeSize (fst stat1), codeSize (fst stat2))
         stat1 = s1 env
         stat2 = s2 env
 
+        -- Kinda shitty, maybe make a helper function for this or refactor the code so that it isn't needed?
+        -- We take the maxSize of the largest branch, because the other branch will then fit as well.
+        -- These two branches can NEVER access each others variables, meaning that is is fine if they overwrite each other.
+        newEnv = env {maxSize = max (maxSize (snd stat1)) (maxSize (snd stat2))}
+
     fStatWhile :: E -> S -> S
-    fStatWhile e s1 env = ([BRA n] ++ fst stat ++ c ++ [BRT (- (n + k + 2))], env, M.size (snd stat))
+    fStatWhile e s1 env = ([BRA n] ++ fst stat ++ c ++ [BRT (- (n + k + 2))], newEnv)
       where
         c = e Value env
         stat = s1 env
+        newEnv = env {maxSize = maxSize (snd stat)}
         (n, k) = (codeSize (fst stat), codeSize c)
 
     fStatReturn :: E -> S
@@ -83,9 +120,7 @@ codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBl
         -- f = undefined
 
         -- f :: (Env -> (Code, Env)) -> (Code, Env) -> (Code, Env)
-        f (inCode, inEnv) x =
-          let !a = dbg "newEnv" newEnv
-           in (inCode ++ newCode, a)
+        f (inCode, inEnv) x = (inCode ++ newCode, newEnv)
           where
             !(newCode, newEnv) = x (dbg "inEnv" inEnv)
 
@@ -100,9 +135,7 @@ codeExpr = (fExprCon, fExprVar, fExprOp)
         Value -> [LDL loc]
         Address -> [LDLA loc]
       where
-        loc = case M.lookup x env of
-          Nothing -> error $ "No variable '" ++ x ++ "' exists."
-          Just n -> n
+        loc = getVar x env
 
     fExprOp :: String -> E -> E -> E
     fExprOp "=" e1 e2 va env = e2 Value env ++ [LDS 0] ++ e1 Address env ++ [STA 0]
