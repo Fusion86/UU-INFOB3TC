@@ -160,7 +160,8 @@ sConst = getValue <$> satisfy isConst
 
     getValue :: Token -> Int
     getValue (ConstInt x) = x
-    getValue (ConstBool x) = if x then 1 else 0
+    -- Value True is encoded by a -1 (all 1 bit pattern 0xFFFFFFFF).
+    getValue (ConstBool x) = if x then -1 else 0
     getValue (ConstChar x) = ord x
     getValue _ = error "Can't convert this value to an integer."
 

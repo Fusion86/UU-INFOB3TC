@@ -17,16 +17,20 @@ import Prelude hiding (EQ, GT, LT)
 {- ORMOLU_DISABLE -}
 -- The types that we generate for each datatype: Our type variables for the algebra
 -- type Env = M.Map String Int
-type C = Code                   -- Class
-type M = Env -> (Code, Env)                   -- Member
-type S = Env -> (Code, Env)     -- Statement
-type E = ValueOrAddress -> Env -> Code -- Expression
+type C = Code                           -- Class
+type M = Env -> (Code, Env)             -- Member
+type S = Env -> (Code, Env)             -- Statement
+type E = ValueOrAddress -> Env -> Code  -- Expression
 {- ORMOLU_ENABLE -}
 
 data Env = Env
   { maxSize :: Int,
     variables :: M.Map String Int
   }
+  deriving (Show)
+
+-- | Whether we are computing the value of a variable, or a pointer to it
+data ValueOrAddress = Value | Address
   deriving (Show)
 
 addVar :: Env -> String -> Env
@@ -71,7 +75,10 @@ codeMember = (fMembDecl, fMembMeth)
     fMembMeth t x ps s env = trace ("envMaxSize: " ++ show envMaxSize) ([LABEL x, LINK envMaxSize] ++ code ++ [UNLINK, RET], emptyEnv)
       where
         envMaxSize = maxSize newEnv
-        (code, newEnv) = s env
+        -- innerEnv = Env 0 $ M.fromList $ zip [x | (Decl _ x) <- ps] [(-(length ps) - 1)..]
+        innerEnv = foldl f env ps
+        f (Env _ vars) (Decl _ name) = env {variables = M.insert name (- length vars - 2) vars}
+        (code, newEnv) = s innerEnv
 
 codeStatement ::
   ( Decl -> S,
@@ -111,7 +118,7 @@ codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBl
         (n, k) = (codeSize (fst stat), codeSize c)
 
     fStatReturn :: E -> S
-    fStatReturn e env = (e Value env ++ [pop] ++ [RET], env)
+    fStatReturn e env = (e Value env ++ [STR R4, UNLINK] ++ [RET], env)
 
     fStatBlock :: [Env -> (Code, Env)] -> Env -> (Code, Env)
     fStatBlock xs env = foldl f ([], env) xs
@@ -124,7 +131,7 @@ codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBl
           where
             !(newCode, newEnv) = x (dbg "inEnv" inEnv)
 
-codeExpr = (fExprCon, fExprVar, fExprOp)
+codeExpr = (fExprCon, fExprVar, fExprOp, fExprCall)
   where
     fExprCon :: Int -> E
     fExprCon n va env = [LDC n]
@@ -139,6 +146,12 @@ codeExpr = (fExprCon, fExprVar, fExprOp)
 
     fExprOp :: String -> E -> E -> E
     fExprOp "=" e1 e2 va env = e2 Value env ++ [LDS 0] ++ e1 Address env ++ [STA 0]
+    fExprOp "&&" e1 e2 va env =
+      let stat2 = e2 Value env
+       in e1 Value env ++ [LDS 0, BRF (codeSize stat2 + 1)] ++ stat2 ++ [AND]
+    fExprOp "||" e1 e2 va env =
+      let stat2 = e2 Value env
+       in e1 Value env ++ [LDS 0, BRT (codeSize stat2 + 1)] ++ stat2 ++ [OR]
     fExprOp op e1 e2 va env = e1 Value env ++ e2 Value env ++ [opCodes M.! op]
       where
         opCodes :: M.Map String Instr
@@ -160,6 +173,22 @@ codeExpr = (fExprCon, fExprVar, fExprOp)
               ("^", XOR)
             ]
 
--- | Whether we are computing the value of a variable, or a pointer to it
-data ValueOrAddress = Value | Address
-  deriving (Show)
+    -- fExprMeth :: String -> [E] -> E
+    -- fExprMeth s envFuncs va env meths = paramCode ++ funcCall ++ return ++ [STS (-paramCount), AJS (-(paramCount - 1))]
+    --   where funcCall = if s == "print" then [TRAP 0] else [Bsr s]
+    --         return = if s /= "print" then [LDR R3] else []
+    --         paramCount = length envFuncs
+    --         paramCode = concatMap (\f -> f Value env meths) envFuncs
+
+    fExprCall :: String -> [E] -> E
+    fExprCall "print" xs va env = concatMap f xs
+      where
+        f :: E -> Code
+        -- LDR R4 is not 100% correct, because print SHOULD return nothing.
+        -- However, every statement is expected to return something, which means that print also has to return
+        -- something. Even if that something is random garbage.
+        f x = x Value env ++ [TRAP 0, LDR R4]
+    fExprCall func xs va env = evalParams ++ [Bsr func] ++ [AJS (- (length xs)), LDR R4]
+      where
+        evalParams = concatMap (\x -> x Value env) xs
+        paramCount = length xs

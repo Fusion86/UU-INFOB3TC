@@ -3,6 +3,14 @@
 module CSharpGram where
 
 import CSharpLex
+    ( sConst,
+      sLowerId,
+      sSemi,
+      sStdType,
+      sUpperId,
+      Token(KeyClass, KeyVoid, KeyElse, Comma, KeyFor, Semicolon, KeyIf,
+            KeyWhile, KeyReturn, CClose, Operator, POpen, PClose, SOpen,
+            SClose, COpen) )
 import Common
 import ParseLib.Abstract hiding (braced, bracketed, parenthesised)
 import Prelude hiding (sequence, (*>), (<$), (<*), (<*>))
@@ -28,6 +36,7 @@ data Expr
   = ExprConst Int
   | ExprVar String
   | ExprOper String Expr Expr
+  | ExprMethodCall String [Expr]
   deriving (Show)
 
 data Decl = Decl Type String
@@ -112,7 +121,12 @@ pExprSimple :: Parser Token Expr
 pExprSimple =
   ExprConst <$> sConst
     <|> ExprVar <$> sLowerId
+    <|> ExprMethodCall <$> sLowerId <*> parenthesised (option (listOf pExpr (symbol Comma)) [])
     <|> parenthesised pExpr
+
+-- pExprCall :: Parser Token Expr
+-- pExprCall = do
+
 
 pExpr :: Parser Token Expr
 pExpr = pExprComplex operatorTable
