@@ -16,7 +16,6 @@ import Prelude hiding (EQ, GT, LT)
 
 {- ORMOLU_DISABLE -}
 -- The types that we generate for each datatype: Our type variables for the algebra
--- type Env = M.Map String Int
 type C = Code                           -- Class
 type M = Env -> (Code, Env)             -- Member
 type S = Env -> (Code, Env)             -- Statement
@@ -39,7 +38,6 @@ addVar (Env maxSize variables) var = case M.lookup var variables of
   --
   Just n -> error $ "Variable '" ++ var ++ "' is already defined in this local scope."
   where
-    -- newMaxSize = maxSize + 1
     newMaxSize = max maxSize (M.size variables + 1)
 
 emptyEnv :: Env
@@ -75,7 +73,6 @@ codeMember = (fMembDecl, fMembMeth)
     fMembMeth t x ps s env = trace ("envMaxSize: " ++ show envMaxSize) ([LABEL x, LINK envMaxSize] ++ code ++ [UNLINK, RET], emptyEnv)
       where
         envMaxSize = maxSize newEnv
-        -- innerEnv = Env 0 $ M.fromList $ zip [x | (Decl _ x) <- ps] [(-(length ps) - 1)..]
         innerEnv = foldl f env ps
         f (Env _ vars) (Decl _ name) = env {variables = M.insert name (- length vars - 2) vars}
         (code, newEnv) = s innerEnv
@@ -123,9 +120,6 @@ codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBl
     fStatBlock :: [Env -> (Code, Env)] -> Env -> (Code, Env)
     fStatBlock xs env = foldl f ([], env) xs
       where
-        -- f :: (Code, Env) -> (Env -> (Code, Env)) -> (Code, Env)
-        -- f = undefined
-
         -- f :: (Env -> (Code, Env)) -> (Code, Env) -> (Code, Env)
         f (inCode, inEnv) x = (inCode ++ newCode, newEnv)
           where
@@ -172,13 +166,6 @@ codeExpr = (fExprCon, fExprVar, fExprOp, fExprCall)
               ("||", OR),
               ("^", XOR)
             ]
-
-    -- fExprMeth :: String -> [E] -> E
-    -- fExprMeth s envFuncs va env meths = paramCode ++ funcCall ++ return ++ [STS (-paramCount), AJS (-(paramCount - 1))]
-    --   where funcCall = if s == "print" then [TRAP 0] else [Bsr s]
-    --         return = if s /= "print" then [LDR R3] else []
-    --         paramCount = length envFuncs
-    --         paramCode = concatMap (\f -> f Value env meths) envFuncs
 
     fExprCall :: String -> [E] -> E
     fExprCall "print" xs va env = concatMap f xs

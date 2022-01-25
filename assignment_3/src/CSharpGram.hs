@@ -112,21 +112,12 @@ pStat =
 
       return $ dbg "end of pFor" forStat
 
--- pExprDecls:: Parser Token d
--- pExprDecls = do
---   stuff <- listOf pExpr (symbol Comma)
---   return ()
-
 pExprSimple :: Parser Token Expr
 pExprSimple =
   ExprConst <$> sConst
     <|> ExprVar <$> sLowerId
     <|> ExprMethodCall <$> sLowerId <*> parenthesised (option (listOf pExpr (symbol Comma)) [])
     <|> parenthesised pExpr
-
--- pExprCall :: Parser Token Expr
--- pExprCall = do
-
 
 pExpr :: Parser Token Expr
 pExpr = pExprComplex operatorTable
