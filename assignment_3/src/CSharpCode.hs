@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module CSharpCode where
 
 import CSharpAlgebra
@@ -123,7 +121,7 @@ codeStatement = (fStatDecl, fStatExpr, fStatIf, fStatWhile, fStatReturn, fStatBl
         -- f :: (Env -> (Code, Env)) -> (Code, Env) -> (Code, Env)
         f (inCode, inEnv) x = (inCode ++ newCode, newEnv)
           where
-            !(newCode, newEnv) = x (dbg "inEnv" inEnv)
+            (newCode, newEnv) = x inEnv
 
 codeExpr = (fExprCon, fExprVar, fExprOp, fExprCall)
   where

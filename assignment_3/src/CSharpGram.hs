@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-
 module CSharpGram where
 
 import CSharpLex
@@ -110,7 +108,7 @@ pStat =
           whileStat = StatWhile condition whileBody
           forStat = StatBlock (init ++ [whileStat])
 
-      return $ dbg "end of pFor" forStat
+      return forStat
 
 pExprSimple :: Parser Token Expr
 pExprSimple =
